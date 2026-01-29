@@ -1,0 +1,7 @@
+{
+  "name": "Totem Interativo Supercopa Rei",
+  "description": "Interactive AI Photo Booth for Flamengo vs Corinthians fans using Gemini 3 Pro Image Preview.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

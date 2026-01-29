@@ -1,0 +1,89 @@
+/* Totem Interativo - Global Styles */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background-color: #000;
+}
+
+body {
+  background-color: #050505;
+  color: white;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Glass effect */
+.liquid-glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* Hide scrollbar for clean UI */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Totem container - 9:16 aspect ratio based on viewport height */
+.totem-container {
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for mobile */
+  width: calc(100vh * 9 / 16);
+  width: calc(100dvh * 9 / 16);
+  max-width: 100vw;
+  position: relative;
+  overflow: hidden;
+}
+
+/* If width exceeds viewport, scale based on width instead */
+@media (max-aspect-ratio: 9/16) {
+  .totem-container {
+    width: 100vw;
+    height: calc(100vw * 16 / 9);
+    max-height: 100vh;
+    max-height: 100dvh;
+  }
+}
+
+/* Fullscreen button animation */
+.fullscreen-btn {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(234, 179, 8, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(234, 179, 8, 0.6);
+  }
+}
+
+/* Slide up animation */
+.animate-slide-up {
+  animation: slideUp 0.5s ease-out forwards;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
