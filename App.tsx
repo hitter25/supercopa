@@ -5,7 +5,7 @@ import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useAppStore } from './store';
 import { ScreenState, TeamId, ImageSize } from './types';
-import { TEAMS, IDOLS } from './constants';
+import { TEAMS, IDOLS, TEAM_TRIVIAS } from './constants';
 import { generateFanImage } from './services/geminiService';
 import {
   createSession,
@@ -1078,7 +1078,7 @@ const CameraScreen = () => {
   }, [countdown]);
 
   const startCapture = () => {
-    setCountdown(5);
+    setCountdown(3);
   };
 
   useEffect(() => {
@@ -1260,7 +1260,22 @@ const GenerationScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [stageText, setStageText] = useState("Analisando Foto...");
+  const [currentTrivia, setCurrentTrivia] = useState(0);
   const generationStartTime = useRef<number>(0);
+
+  // Rotacionar trivias a cada 5 segundos durante a geração
+  useEffect(() => {
+    if (!isGenerating || !selectedTeam) return;
+
+    const trivias = TEAM_TRIVIAS[selectedTeam];
+    setCurrentTrivia(Math.floor(Math.random() * trivias.length));
+
+    const interval = setInterval(() => {
+      setCurrentTrivia(prev => (prev + 1) % trivias.length);
+    }, 7000);
+
+    return () => clearInterval(interval);
+  }, [isGenerating, selectedTeam]);
 
   useEffect(() => {
     let interval: any;
@@ -1342,8 +1357,11 @@ const GenerationScreen = () => {
         setScreen(ScreenState.RESULT);
       }, 500);
 
-    } catch (e) {
-      setError("Não foi possível gerar a magia agora. Tente novamente.");
+    } catch (e: any) {
+      console.error('❌ Erro ao gerar imagem:', e);
+      console.error('Detalhes:', JSON.stringify(e, null, 2));
+      const errorMessage = e?.message || e?.error?.message || "Não foi possível gerar a magia agora. Tente novamente.";
+      setError(errorMessage);
       setIsGenerating(false);
       setProgress(0);
     }
@@ -1358,14 +1376,32 @@ const GenerationScreen = () => {
       <div className="flex-1 relative rounded-2xl overflow-hidden liquid-glass border-0 transition-all duration-500">
         <AnimatePresence>
         {isGenerating && (
-           <motion.div 
+           <motion.div
              initial={{ opacity: 0 }}
              animate={{ opacity: 1 }}
              exit={{ opacity: 0 }}
-             className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-20 p-8 backdrop-blur-md"
+             className="absolute inset-0 flex flex-col items-center justify-between bg-black/90 z-20 p-8 backdrop-blur-md"
            >
-             
-             <div className="relative w-56 h-56 flex items-center justify-center mb-10">
+
+             {/* Trivias no topo */}
+             {selectedTeam && (
+               <div className="px-4 max-w-md min-h-[80px] flex items-center">
+                 <AnimatePresence mode="wait">
+                   <motion.p
+                     key={currentTrivia}
+                     initial={{ opacity: 0, y: 20 }}
+                     animate={{ opacity: 1, y: 0 }}
+                     exit={{ opacity: 0, y: -20 }}
+                     transition={{ duration: 0.5 }}
+                     className="text-white text-base text-center leading-relaxed font-medium"
+                   >
+                     {TEAM_TRIVIAS[selectedTeam][currentTrivia]}
+                   </motion.p>
+                 </AnimatePresence>
+               </div>
+             )}
+
+             <div className="relative w-56 h-56 flex items-center justify-center">
                 <motion.div 
                   className="absolute inset-0 border-4 border-transparent border-t-yellow-500/60 rounded-full"
                   animate={{ rotate: 360 }}
@@ -1411,13 +1447,21 @@ const GenerationScreen = () => {
                </p>
              </div>
 
-             <div className="w-64 h-1 bg-white/10 rounded-full mt-8 overflow-hidden">
-                <motion.div 
-                  className="h-full bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ type: "spring", stiffness: 50, damping: 20 }}
-                />
+             {/* Barra de progresso e aviso */}
+             <div className="flex flex-col items-center gap-4 pb-4">
+               <div className="w-64 h-1 bg-white/10 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress}%` }}
+                    transition={{ type: "spring", stiffness: 50, damping: 20 }}
+                  />
+               </div>
+
+               {/* Aviso de tempo */}
+               <p className="text-white/50 text-xs text-center">
+                 ⏱️ A revelação da foto leva em média 30 a 40 segundos
+               </p>
              </div>
 
            </motion.div>
@@ -1597,22 +1641,14 @@ const ResultScreen = () => {
         >
           <img src={generatedImage} alt="Final Result" className="w-full h-full object-cover" />
 
-          {/* Badge with idol name */}
+          {/* Logos */}
           <div
             ref={badgeRef}
-            className={`absolute bottom-4 left-4 px-4 py-2 rounded-full backdrop-blur-md ${
-              isFlamengo ? 'bg-red-900/70 border border-red-500/50' : 'bg-black/70 border border-white/30'
-            }`}
+            className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-6"
             style={{ opacity: 0 }}
           >
-            <span className="text-white text-sm font-bold">
-              Foto com {selectedIdol?.nickname}
-            </span>
-          </div>
-
-          {/* Gemini badge */}
-          <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-sm px-3 py-1 rounded-full text-xs text-white/70 border border-white/10">
-            Gerado com Gemini
+            <img src="/assets/logo-hitlabz.svg" alt="Hit Labz" className="h-8" />
+            <img src="/assets/logo-inpacto.svg" alt="Inpacto" className="h-8" />
           </div>
         </div>
 

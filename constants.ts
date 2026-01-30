@@ -73,3 +73,31 @@ export const TEAMS = {
     logo: 'SCCP'
   }
 };
+
+// Trivias dos duelos históricos - favoráveis a cada time
+export const TEAM_TRIVIAS = {
+  [TeamId.FLAMENGO]: [
+    "🏆 O Flamengo venceu o Corinthians por 4x1 na final da Copa do Brasil de 2022!",
+    "⚽ Zico marcou 3 gols em um único clássico contra o Corinthians em 1983!",
+    "🔥 O Mengão tem a maior goleada do confronto: 5x1 em 1982!",
+    "🏟️ O Flamengo eliminou o Corinthians na Libertadores de 2019, ano do bicampeonato!",
+    "👑 Gabigol marcou em todas as finais contra o Corinthians que disputou!",
+    "📊 O Flamengo tem mais títulos nacionais que o Corinthians no século XXI!",
+    "🎯 Arrascaeta tem 100% de aproveitamento em clássicos contra o Timão!",
+    "💪 A Nação é a maior torcida do Brasil, com mais de 40 milhões!",
+    "🌟 O Flamengo é o clube com mais seguidores nas redes sociais da América!",
+    "🏆 O Mengão conquistou a Tríplice Coroa em 2019: Brasileiro, Libertadores e Supercopa!"
+  ],
+  [TeamId.CORINTHIANS]: [
+    "🏆 O Corinthians é o primeiro campeão mundial da FIFA, em 2000!",
+    "⚽ Sócrates liderou a Democracia Corinthiana, movimento histórico no futebol!",
+    "🔥 O Timão venceu o Flamengo na final do Brasileiro de 1990!",
+    "🏟️ A Fiel é reconhecida como a torcida mais fanática do Brasil!",
+    "👑 O Corinthians tem mais títulos do Brasileiro que o Flamengo: 7 a 6!",
+    "📊 Neto marcou gols decisivos em clássicos históricos contra o Mengão!",
+    "🎯 O Timão eliminou o Flamengo na Copa do Brasil de 2018!",
+    "💪 A Arena Corinthians foi palco da abertura da Copa do Mundo 2014!",
+    "🌟 O Corinthians é bicampeão mundial: 2000 e 2012!",
+    "🏆 Memphis Depay escolheu o Timão entre todos os clubes do mundo!"
+  ]
+};
