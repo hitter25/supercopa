@@ -16,6 +16,11 @@ import {
   saveWhatsAppShare,
   updateWhatsAppShareStatus
 } from './services/supabaseService';
+import {
+  triggerWebhook,
+  isWebhookConfigured,
+  WebhookPayload
+} from './services/webhookService';
 import Button from './components/Button';
 
 // Shutter Sound - usando Web Audio API para gerar um som de clique simples
@@ -1625,10 +1630,11 @@ const ResultScreen = () => {
 };
 
 const WhatsAppScreen = () => {
-    const { resetSession, sessionId, generatedImageId } = useAppStore();
+    const { resetSession, sessionId, generatedImageId, generatedImageUrl, selectedTeam, selectedIdol, imageSize } = useAppStore();
     const [phone, setPhone] = useState('');
     const [sent, setSent] = useState(false);
     const [isSending, setIsSending] = useState(false);
+    const [webhookStatus, setWebhookStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
     const containerRef = useRef<HTMLDivElement>(null);
     const logosRef = useRef<HTMLDivElement>(null);
     const titleRef = useRef<HTMLHeadingElement>(null);
@@ -1637,22 +1643,99 @@ const WhatsAppScreen = () => {
     const cancelRef = useRef<HTMLButtonElement>(null);
     const successRef = useRef<HTMLDivElement>(null);
 
+    // Formatar número de telefone para padrão brasileiro
+    const formatPhoneNumber = (value: string): string => {
+      // Remove tudo que não é número
+      const numbers = value.replace(/\D/g, '');
+
+      // Limita a 11 dígitos (DDD + 9 dígitos)
+      const limited = numbers.slice(0, 11);
+
+      // Formata conforme digita
+      if (limited.length <= 2) {
+        return limited;
+      } else if (limited.length <= 7) {
+        return `(${limited.slice(0, 2)}) ${limited.slice(2)}`;
+      } else {
+        return `(${limited.slice(0, 2)}) ${limited.slice(2, 7)}-${limited.slice(7)}`;
+      }
+    };
+
+    // Validar número de telefone
+    const isValidPhone = (value: string): boolean => {
+      const numbers = value.replace(/\D/g, '');
+      // Deve ter 10 ou 11 dígitos (com ou sem o 9)
+      return numbers.length >= 10 && numbers.length <= 11;
+    };
+
+    // Extrair apenas números do telefone
+    const getPhoneNumbers = (value: string): string => {
+      return value.replace(/\D/g, '');
+    };
+
     const handleSend = async () => {
-        if (isSending) return;
+        if (isSending || !isValidPhone(phone)) return;
         setIsSending(true);
+        setWebhookStatus('sending');
+
+        const phoneNumbers = getPhoneNumbers(phone);
+        let shareId = '';
 
         try {
-          // Registrar compartilhamento no Supabase
+          // 1. Registrar compartilhamento no Supabase
           if (sessionId && generatedImageId) {
-            const shareId = await saveWhatsAppShare(sessionId, generatedImageId, phone);
+            shareId = await saveWhatsAppShare(sessionId, generatedImageId, phoneNumbers);
             console.log('📤 Compartilhamento registrado:', shareId);
 
-            // Marcar sessão como completa
-            await completeSession(sessionId);
+            // 2. Disparar webhook N8N para envio real via WhatsApp
+            if (isWebhookConfigured()) {
+              console.log('🚀 Disparando webhook N8N...');
 
-            // Simular envio do WhatsApp (aqui entraria a integração real)
-            // Por enquanto, marcamos como enviado
-            await updateWhatsAppShareStatus(shareId, 'sent');
+              const webhookPayload: WebhookPayload = {
+                // Identificadores
+                sessionId: sessionId,
+                generatedImageId: generatedImageId,
+                shareId: shareId,
+
+                // Dados do usuário
+                phoneNumber: phoneNumbers,
+
+                // Dados da imagem
+                imageUrl: generatedImageUrl || '',
+
+                // Contexto da sessão
+                teamId: selectedTeam || '',
+                teamName: selectedTeam ? TEAMS[selectedTeam].name : '',
+                idolId: selectedIdol?.id || '',
+                idolName: selectedIdol?.name || '',
+                idolNickname: selectedIdol?.nickname || '',
+
+                // Metadados
+                timestamp: new Date().toISOString(),
+                imageSize: imageSize,
+              };
+
+              const webhookResult = await triggerWebhook(webhookPayload);
+
+              if (webhookResult.success) {
+                console.log('✅ Webhook N8N executado com sucesso');
+                setWebhookStatus('success');
+                // Atualizar status para 'sent' após webhook bem sucedido
+                await updateWhatsAppShareStatus(shareId, 'sent');
+              } else {
+                console.error('❌ Erro no webhook N8N:', webhookResult.error);
+                setWebhookStatus('error');
+                // Marcar como 'pending' para retry posterior
+                await updateWhatsAppShareStatus(shareId, 'failed', webhookResult.error);
+              }
+            } else {
+              // Webhook não configurado - apenas registrar no banco
+              console.warn('⚠️ Webhook N8N não configurado. Apenas registrando no banco.');
+              await updateWhatsAppShareStatus(shareId, 'sent');
+            }
+
+            // 3. Marcar sessão como completa
+            await completeSession(sessionId);
           }
 
           setSent(true);
@@ -1660,7 +1743,14 @@ const WhatsAppScreen = () => {
             resetSession();
           }, 3000);
         } catch (error) {
-          console.error('Erro ao registrar compartilhamento:', error);
+          console.error('Erro ao processar envio:', error);
+          setWebhookStatus('error');
+
+          // Tentar atualizar status como falha
+          if (shareId) {
+            await updateWhatsAppShareStatus(shareId, 'failed', String(error)).catch(console.error);
+          }
+
           // Continua com o fluxo mesmo com erro
           setSent(true);
           setTimeout(() => {
@@ -1777,17 +1867,22 @@ const WhatsAppScreen = () => {
                     ref={inputRef}
                     type="tel"
                     value={phone}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPhone(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPhone(formatPhoneNumber(e.target.value))}
                     placeholder="(11) 99999-9999"
-                    className="w-full p-6 text-3xl text-center bg-white/10 border-2 border-green-500/30 rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-colors"
+                    className={`w-full p-6 text-3xl text-center bg-white/10 border-2 rounded-2xl text-white placeholder-gray-500 focus:outline-none transition-colors ${
+                      phone.length > 0 && !isValidPhone(phone)
+                        ? 'border-red-500/50 focus:border-red-500'
+                        : 'border-green-500/30 focus:border-green-500'
+                    }`}
                     style={{ opacity: 0 }}
+                    maxLength={16}
                 />
 
                 {/* Botão verde neon estilo abertura */}
                 <button
                     ref={buttonRef}
                     onClick={handleSend}
-                    disabled={phone.length < 10 || isSending}
+                    disabled={!isValidPhone(phone) || isSending}
                     className="group relative cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ opacity: 0 }}
                 >
