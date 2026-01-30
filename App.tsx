@@ -668,7 +668,7 @@ const IdolSelectionScreen = () => {
     if (sessionId) {
       updateSession(sessionId, {
         idol_id: idol.id,
-        current_screen: ScreenState.INSTRUCTION
+        current_screen: ScreenState.CAMERA
       }).catch(console.error);
     }
 
@@ -676,7 +676,7 @@ const IdolSelectionScreen = () => {
     const tl = gsap.timeline({
       onComplete: () => {
         selectIdol(idol);
-        setScreen(ScreenState.INSTRUCTION);
+        setScreen(ScreenState.CAMERA);
       }
     });
 
@@ -1986,7 +1986,7 @@ const App = () => {
             {currentScreen === ScreenState.WELCOME && <WelcomeScreen />}
             {currentScreen === ScreenState.TEAM_SELECTION && <TeamSelectionScreen />}
             {currentScreen === ScreenState.IDOL_SELECTION && <IdolSelectionScreen />}
-            {currentScreen === ScreenState.INSTRUCTION && <InstructionScreen />}
+            {/* InstructionScreen removida - vai direto para câmera */}
             {currentScreen === ScreenState.CAMERA && <CameraScreen />}
             {currentScreen === ScreenState.GENERATION && <GenerationScreen />}
             {currentScreen === ScreenState.RESULT && <ResultScreen />}
