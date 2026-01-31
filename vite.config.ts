@@ -4,6 +4,13 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+
+    // Use loadEnv values first, then fall back to process.env (for Docker builds)
+    const GEMINI_API_KEY = env.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    const SUPABASE_URL = env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+    const N8N_WEBHOOK_URL = env.VITE_N8N_WEBHOOK_URL || process.env.VITE_N8N_WEBHOOK_URL || '';
+
     return {
       server: {
         port: 3000,
@@ -11,12 +18,12 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),
-        'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),
-        'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || 'https://tdecoglljtghaulaycvd.supabase.co'),
-        'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkZWNvZ2xsanRnaGF1bGF5Y3ZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NzIyNzcsImV4cCI6MjA4NDM0ODI3N30._r1OSfQDdJpCR0H5UFm05D1SEkYx6AVqjfWqnv0BtYc'),
-        'import.meta.env.VITE_N8N_WEBHOOK_URL': JSON.stringify(env.VITE_N8N_WEBHOOK_URL || '')
+        'process.env.API_KEY': JSON.stringify(GEMINI_API_KEY),
+        'process.env.GEMINI_API_KEY': JSON.stringify(GEMINI_API_KEY),
+        'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(GEMINI_API_KEY),
+        'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(SUPABASE_URL),
+        'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(SUPABASE_ANON_KEY),
+        'import.meta.env.VITE_N8N_WEBHOOK_URL': JSON.stringify(N8N_WEBHOOK_URL)
       },
       resolve: {
         alias: {
