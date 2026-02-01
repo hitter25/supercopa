@@ -12,19 +12,7 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build arguments for environment variables (passed via --build-arg)
-ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_ANON_KEY
-ARG VITE_GEMINI_API_KEY
-ARG VITE_N8N_WEBHOOK_URL
-
-# Set environment variables for build
-ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
-ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
-ENV VITE_GEMINI_API_KEY=$VITE_GEMINI_API_KEY
-ENV VITE_N8N_WEBHOOK_URL=$VITE_N8N_WEBHOOK_URL
-
-# Build the app
+# Build the app (no env vars needed - they are injected at runtime)
 RUN npm run build
 
 # Production stage
@@ -36,8 +24,12 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
+# Copy entrypoint script
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 # Expose port 8080 (Cloud Run default)
 EXPOSE 8080
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Use entrypoint to inject env vars at runtime
+ENTRYPOINT ["/docker-entrypoint.sh"]

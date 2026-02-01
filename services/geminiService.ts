@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { ImageSize } from '../types';
+import { getEnv } from './envService';
 
 export const generateFanImage = async (
   fanImageBase64: string,
@@ -22,14 +23,13 @@ export const generateFanImage = async (
   }
 
   // 2. Initialize Gemini Client (Fresh instance)
-  // API key is injected at build time via Vite's define config
-  const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+  // API key is read from runtime config (window.__ENV__) or build time (import.meta.env)
+  const apiKey = getEnv('VITE_GEMINI_API_KEY');
 
   if (!apiKey) {
     console.error('❌ GEMINI API KEY not configured!');
-    console.error('   process.env.API_KEY:', process.env.API_KEY ? 'SET' : 'NOT SET');
-    console.error('   import.meta.env.VITE_GEMINI_API_KEY:', import.meta.env.VITE_GEMINI_API_KEY ? 'SET' : 'NOT SET');
-    throw new Error('API key must be set when using the Gemini API. Check build configuration.');
+    console.error('   Check Cloud Run environment variables or .env file');
+    throw new Error('API key must be set when using the Gemini API. Configure VITE_GEMINI_API_KEY in Cloud Run.');
   }
 
   const ai = new GoogleGenAI({ apiKey });

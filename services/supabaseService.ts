@@ -1,9 +1,27 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { DbSession, DbGeneratedImage, DbWhatsAppShare, ImageSize } from '../types';
+import { getEnv } from './envService';
 
-// Configuração do Supabase - Projeto: supercopa (tdecoglljtghaulaycvd)
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://tdecoglljtghaulaycvd.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkZWNvZ2xsanRnaGF1bGF5Y3ZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NzIyNzcsImV4cCI6MjA4NDM0ODI3N30._r1OSfQDdJpCR0H5UFm05D1SEkYx6AVqjfWqnv0BtYc';
+// Lazy initialization of Supabase client
+let supabaseInstance: SupabaseClient | null = null;
+
+function getSupabaseClient(): SupabaseClient {
+  if (!supabaseInstance) {
+    const supabaseUrl = getEnv('VITE_SUPABASE_URL');
+    const supabaseAnonKey = getEnv('VITE_SUPABASE_ANON_KEY');
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('❌ Supabase not configured. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
+    }
+
+    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
+  }
+  return supabaseInstance;
+}
+
+// For backward compatibility
+const supabaseUrl = getEnv('VITE_SUPABASE_URL');
+const supabaseAnonKey = getEnv('VITE_SUPABASE_ANON_KEY');
 
 // Informações do projeto
 export const SUPABASE_PROJECT_INFO = {
@@ -13,8 +31,12 @@ export const SUPABASE_PROJECT_INFO = {
   url: supabaseUrl
 };
 
-// Criar cliente do Supabase
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Criar cliente do Supabase (lazy - só inicializa quando usado)
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_, prop) {
+    return Reflect.get(getSupabaseClient(), prop);
+  }
+});
 
 // ============================================
 // SESSION MANAGEMENT

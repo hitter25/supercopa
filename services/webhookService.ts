@@ -3,8 +3,12 @@
  * Envia dados para o webhook após o usuário clicar em enviar para WhatsApp
  */
 
-// URL do webhook N8N - configurada via variável de ambiente
-const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || '';
+import { getEnv } from './envService';
+
+// URL do webhook N8N - configurada via variável de ambiente (runtime)
+function getWebhookUrl(): string {
+  return getEnv('VITE_getWebhookUrl()');
+}
 
 export interface WebhookPayload {
   // Identificadores da sessão
@@ -41,14 +45,8 @@ export interface WebhookResponse {
  * Verifica se o webhook está configurado
  */
 export function isWebhookConfigured(): boolean {
-  return !!N8N_WEBHOOK_URL && N8N_WEBHOOK_URL.length > 0;
-}
-
-/**
- * Obtém a URL do webhook configurada
- */
-export function getWebhookUrl(): string {
-  return N8N_WEBHOOK_URL;
+  const url = getWebhookUrl();
+  return !!url && url.length > 0 && !url.startsWith('__');
 }
 
 /**
@@ -64,20 +62,20 @@ export function getWebhookUrl(): string {
 export async function triggerWebhook(payload: WebhookPayload): Promise<WebhookResponse> {
   // Verificar se o webhook está configurado
   if (!isWebhookConfigured()) {
-    console.warn('⚠️ Webhook N8N não configurado. Configure VITE_N8N_WEBHOOK_URL no .env.local');
+    console.warn('⚠️ Webhook N8N não configurado. Configure VITE_getWebhookUrl() no .env.local');
     return {
       success: false,
       message: 'Webhook não configurado',
-      error: 'VITE_N8N_WEBHOOK_URL não está definido'
+      error: 'VITE_getWebhookUrl() não está definido'
     };
   }
 
   console.log('🚀 Disparando webhook N8N...');
-  console.log('📍 URL:', N8N_WEBHOOK_URL);
+  console.log('📍 URL:', getWebhookUrl());
   console.log('📦 Payload:', JSON.stringify(payload, null, 2));
 
   try {
-    const response = await fetch(N8N_WEBHOOK_URL, {
+    const response = await fetch(getWebhookUrl(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -150,7 +148,7 @@ export async function testWebhookConnection(): Promise<WebhookResponse> {
     return {
       success: false,
       message: 'Webhook não configurado',
-      error: 'Configure VITE_N8N_WEBHOOK_URL no arquivo .env.local'
+      error: 'Configure VITE_getWebhookUrl() no arquivo .env.local'
     };
   }
 
@@ -164,7 +162,7 @@ export async function testWebhookConnection(): Promise<WebhookResponse> {
       timestamp: new Date().toISOString()
     };
 
-    const response = await fetch(N8N_WEBHOOK_URL, {
+    const response = await fetch(getWebhookUrl(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
