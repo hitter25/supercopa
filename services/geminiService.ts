@@ -22,8 +22,17 @@ export const generateFanImage = async (
   }
 
   // 2. Initialize Gemini Client (Fresh instance)
-  // The API key is obtained from process.env.API_KEY which is automatically updated after selection
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // API key is injected at build time via Vite's define config
+  const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+
+  if (!apiKey) {
+    console.error('❌ GEMINI API KEY not configured!');
+    console.error('   process.env.API_KEY:', process.env.API_KEY ? 'SET' : 'NOT SET');
+    console.error('   import.meta.env.VITE_GEMINI_API_KEY:', import.meta.env.VITE_GEMINI_API_KEY ? 'SET' : 'NOT SET');
+    throw new Error('API key must be set when using the Gemini API. Check build configuration.');
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
 
   // 3. Prepare Prompt & Media
   // Removing data URL prefix for the API if present
