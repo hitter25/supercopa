@@ -7,7 +7,7 @@ import { getEnv } from './envService';
 
 // URL do webhook N8N - configurada via variável de ambiente (runtime)
 function getWebhookUrl(): string {
-  return getEnv('VITE_getWebhookUrl()');
+  return getEnv('VITE_N8N_WEBHOOK_URL');
 }
 
 export interface WebhookPayload {
@@ -62,11 +62,11 @@ export function isWebhookConfigured(): boolean {
 export async function triggerWebhook(payload: WebhookPayload): Promise<WebhookResponse> {
   // Verificar se o webhook está configurado
   if (!isWebhookConfigured()) {
-    console.warn('⚠️ Webhook N8N não configurado. Configure VITE_getWebhookUrl() no .env.local');
+    console.warn('⚠️ Webhook N8N não configurado. Configure VITE_N8N_WEBHOOK_URL no .env.local');
     return {
       success: false,
       message: 'Webhook não configurado',
-      error: 'VITE_getWebhookUrl() não está definido'
+      error: 'VITE_N8N_WEBHOOK_URL não está definido'
     };
   }
 
@@ -148,7 +148,7 @@ export async function testWebhookConnection(): Promise<WebhookResponse> {
     return {
       success: false,
       message: 'Webhook não configurado',
-      error: 'Configure VITE_getWebhookUrl() no arquivo .env.local'
+      error: 'Configure VITE_N8N_WEBHOOK_URL no arquivo .env.local'
     };
   }
 
