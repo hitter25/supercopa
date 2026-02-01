@@ -1021,6 +1021,7 @@ const CameraScreen = () => {
   const [streamError, setStreamError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [videoDimensions, setVideoDimensions] = useState<{width: number, height: number} | null>(null);
 
   const isFlamengo = selectedTeam === TeamId.FLAMENGO;
 
@@ -1040,7 +1041,16 @@ const CameraScreen = () => {
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.onloadedmetadata = () => setIsReady(true);
+          videoRef.current.onloadedmetadata = () => {
+            setIsReady(true);
+            if (videoRef.current) {
+              setVideoDimensions({
+                width: videoRef.current.videoWidth,
+                height: videoRef.current.videoHeight
+              });
+              console.log('📹 Dimensões da câmera:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
+            }
+          };
         }
       } catch (err) {
         console.error("Camera Error:", err);
@@ -1098,46 +1108,98 @@ const CameraScreen = () => {
       playShutterSound();
       setShowFlash(true);
 
-      // Capture Image using Canvas
+      // Capture Image using Canvas (WYSIWYG - corresponde ao que é exibido)
       if (videoRef.current && canvasRef.current) {
         const video = videoRef.current;
         const canvas = canvasRef.current;
-
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
         const ctx = canvas.getContext('2d');
-        if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageSrc = canvas.toDataURL('image/jpeg', 0.9);
 
-            // Salvar no Supabase Storage
-            const saveAndNavigate = async () => {
-              setIsSaving(true);
-              try {
-                if (sessionId) {
-                  const { url } = await saveCapturedImage(sessionId, imageSrc);
-                  setCapturedImage(imageSrc, url);
-                  console.log('📸 Foto salva no storage:', url);
-                } else {
-                  setCapturedImage(imageSrc);
-                }
-              } catch (error) {
-                console.error('Erro ao salvar foto:', error);
+        if (ctx && videoDimensions) {
+          const videoAspect = videoDimensions.width / videoDimensions.height;
+
+          // Definir tamanho do canvas como 9:16 portrait
+          const targetWidth = 720;
+          const targetHeight = 1280;
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+
+          // Calcular área de recorte do vídeo
+          let sx: number, sy: number, sw: number, sh: number;
+
+          if (videoAspect <= 1.0) {
+            // Vídeo portrait: capturar tudo, pode ter barras laterais
+            sw = video.videoWidth;
+            sh = video.videoHeight;
+            sx = 0;
+            sy = 0;
+          } else {
+            // Vídeo landscape: recortar para 9:16, priorizar topo (rosto)
+            sh = video.videoHeight;
+            sw = sh * (9/16);
+            sx = (video.videoWidth - sw) / 2;
+            sy = 0; // Topo (prioriza rosto)
+          }
+
+          // Aplicar mirror horizontal (selfie)
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+
+          // Desenhar área recortada
+          ctx.drawImage(video, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
+
+          const imageSrc = canvas.toDataURL('image/jpeg', 0.9);
+
+          console.log('📸 Captura WYSIWYG:', {
+            videoOriginal: `${video.videoWidth}x${video.videoHeight}`,
+            aspectRatio: videoAspect.toFixed(2),
+            recorte: `sx:${sx.toFixed(0)} sy:${sy.toFixed(0)} sw:${sw.toFixed(0)} sh:${sh.toFixed(0)}`,
+            canvasFinal: `${targetWidth}x${targetHeight}`
+          });
+
+          // Salvar no Supabase Storage
+          const saveAndNavigate = async () => {
+            setIsSaving(true);
+            try {
+              if (sessionId) {
+                const { url } = await saveCapturedImage(sessionId, imageSrc);
+                setCapturedImage(imageSrc, url);
+                console.log('📸 Foto salva no storage:', url);
+              } else {
                 setCapturedImage(imageSrc);
-              } finally {
-                setIsSaving(false);
-                setScreen(ScreenState.GENERATION);
-                setShowFlash(false);
               }
-            };
+            } catch (error) {
+              console.error('Erro ao salvar foto:', error);
+              setCapturedImage(imageSrc);
+            } finally {
+              setIsSaving(false);
+              setScreen(ScreenState.GENERATION);
+              setShowFlash(false);
+            }
+          };
 
-            const finishTimer = setTimeout(saveAndNavigate, 400);
-            return () => clearTimeout(finishTimer);
+          const finishTimer = setTimeout(saveAndNavigate, 400);
+          return () => clearTimeout(finishTimer);
         }
       }
     }
-  }, [countdown, setCapturedImage, setScreen, sessionId]);
+  }, [countdown, setCapturedImage, setScreen, sessionId, videoDimensions]);
+
+  // Função helper para classe CSS dinâmica baseada no aspect ratio da câmera
+  const getVideoClass = () => {
+    const baseClass = "h-full w-full transform scale-x-[-1]";
+
+    if (!videoDimensions) return `${baseClass} object-contain`;
+
+    const videoAspect = videoDimensions.width / videoDimensions.height;
+
+    // Se vídeo é portrait ou quase quadrado: object-contain (sem crop)
+    if (videoAspect <= 1.0) {
+      return `${baseClass} object-contain`;
+    }
+
+    // Se vídeo é landscape: object-cover com posição superior (priorizar rosto)
+    return `${baseClass} object-cover object-top`;
+  };
 
   return (
     <div ref={containerRef} className="relative h-full w-full bg-black overflow-hidden">
@@ -1170,7 +1232,7 @@ const CameraScreen = () => {
             autoPlay
             playsInline
             muted
-            className="h-full w-full object-contain transform scale-x-[-1]"
+            className={getVideoClass()}
           />
         )}
 
