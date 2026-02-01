@@ -1031,8 +1031,9 @@ const CameraScreen = () => {
         const stream = await navigator.mediaDevices.getUserMedia({
             video: {
                 facingMode: 'user',
-                width: { ideal: 1080 },
-                height: { ideal: 1920 }
+                width: { ideal: 720, max: 1080 },
+                height: { ideal: 1280, max: 1920 },
+                aspectRatio: { ideal: 9/16 }
             },
             audio: false
         });
@@ -1169,7 +1170,7 @@ const CameraScreen = () => {
             autoPlay
             playsInline
             muted
-            className="h-full w-full object-cover transform scale-x-[-1]"
+            className="h-full w-full object-contain transform scale-x-[-1]"
           />
         )}
 
