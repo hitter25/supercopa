@@ -21,8 +21,12 @@ import {
   isWebhookConfigured,
   WebhookPayload
 } from './services/webhookService';
+import { getCurrentUser, onAuthStateChange } from './services/authService';
 import Button from './components/Button';
 import NumericKeyboard from './components/NumericKeyboard';
+import LoginPage from './components/LoginPage';
+import Dashboard from './components/Dashboard';
+import type { User } from '@supabase/supabase-js';
 
 // Shutter Sound - usando Web Audio API para gerar um som de clique simples
 const playShutterSound = () => {
@@ -1944,13 +1948,31 @@ const WhatsAppScreen = () => {
     )
 }
 
-// Main App Component
-const App = () => {
+// Loading Screen for auth check
+const LoadingScreen = () => (
+  <div
+    className="min-h-screen w-full flex items-center justify-center"
+    style={{
+      background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)'
+    }}
+  >
+    <div className="flex flex-col items-center gap-4">
+      <svg className="animate-spin h-10 w-10 text-blue-500" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+      </svg>
+      <p className="text-slate-400 text-sm">Carregando...</p>
+    </div>
+  </div>
+);
+
+// Totem App (original flow)
+const TotemApp = () => {
   const { currentScreen, selectedTeam } = useAppStore();
 
   const getBackgroundGradient = () => {
     if (!selectedTeam) return 'bg-gradient-to-br from-gray-900 to-black';
-    return selectedTeam === TeamId.FLAMENGO 
+    return selectedTeam === TeamId.FLAMENGO
       ? 'bg-gradient-to-br from-red-900 via-black to-red-950'
       : 'bg-gradient-to-br from-gray-800 via-black to-gray-900';
   };
@@ -1981,6 +2003,68 @@ const App = () => {
       </div>
     </div>
   );
+};
+
+// Main App Component with Routing
+const App = () => {
+  const [currentRoute, setCurrentRoute] = useState(window.location.pathname);
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Handle browser navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentRoute(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Check auth on mount
+  useEffect(() => {
+    getCurrentUser().then(user => {
+      setUser(user);
+      setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = onAuthStateChange(setUser);
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Navigation helper
+  const navigate = (path: string) => {
+    window.history.pushState({}, '', path);
+    setCurrentRoute(path);
+  };
+
+  // Login page
+  if (currentRoute === '/login') {
+    return (
+      <LoginPage
+        onSuccess={() => navigate('/dashboard')}
+      />
+    );
+  }
+
+  // Dashboard page
+  if (currentRoute === '/dashboard') {
+    if (authLoading) {
+      return <LoadingScreen />;
+    }
+    if (!user) {
+      navigate('/login');
+      return <LoadingScreen />;
+    }
+    return (
+      <Dashboard
+        user={user}
+        onLogout={() => navigate('/')}
+      />
+    );
+  }
+
+  // Default: Totem app
+  return <TotemApp />;
 };
 
 export default App;

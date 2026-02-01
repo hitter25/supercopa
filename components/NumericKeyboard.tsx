@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { gsap } from 'gsap';
 
 interface NumericKeyboardProps {
@@ -17,6 +17,7 @@ const NumericKeyboard: React.FC<NumericKeyboardProps> = ({
   isLoading,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const touchedRef = useRef<boolean>(false);
 
   // Layout das teclas numéricas (3x4)
   const numericKeys = [
@@ -37,67 +38,88 @@ const NumericKeyboard: React.FC<NumericKeyboardProps> = ({
     );
   }, []);
 
-  // Feedback visual de toque na tecla
-  const handleKeyTouchStart = (e: React.TouchEvent | React.MouseEvent, key: string) => {
-    const target = e.currentTarget as HTMLElement;
+  // Reset touch flag after a short delay
+  const resetTouchFlag = useCallback(() => {
+    setTimeout(() => {
+      touchedRef.current = false;
+    }, 300);
+  }, []);
+
+  // Feedback visual - press down
+  const animatePress = (target: HTMLElement, color: string) => {
     gsap.to(target, {
       scale: 0.95,
-      backgroundColor: 'rgba(34, 197, 94, 0.3)',
+      backgroundColor: color,
       duration: 0.1,
     });
+  };
 
-    if (key !== '') {
-      onKeyPress(key);
+  // Feedback visual - release
+  const animateRelease = (target: HTMLElement) => {
+    gsap.to(target, {
+      scale: 1,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      duration: 0.2,
+    });
+  };
+
+  // Handle numeric key press
+  const handleKeyPress = useCallback((key: string, target: HTMLElement, isTouch: boolean) => {
+    if (key === '') return;
+
+    // Prevent double firing on mobile
+    if (isTouch) {
+      touchedRef.current = true;
+    } else if (touchedRef.current) {
+      return; // Skip mouse event if touch just happened
     }
-  };
 
-  const handleKeyTouchEnd = (e: React.TouchEvent | React.MouseEvent) => {
-    const target = e.currentTarget as HTMLElement;
-    gsap.to(target, {
-      scale: 1,
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-      duration: 0.2,
-    });
-  };
+    animatePress(target, 'rgba(34, 197, 94, 0.3)');
+    onKeyPress(key);
+  }, [onKeyPress]);
 
-  // Feedback para backspace
-  const handleBackspaceTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
-    const target = e.currentTarget as HTMLElement;
-    gsap.to(target, {
-      scale: 0.95,
-      backgroundColor: 'rgba(239, 68, 68, 0.3)',
-      duration: 0.1,
-    });
+  const handleKeyRelease = useCallback((target: HTMLElement) => {
+    animateRelease(target);
+    resetTouchFlag();
+  }, [resetTouchFlag]);
+
+  // Handle backspace
+  const handleBackspacePress = useCallback((target: HTMLElement, isTouch: boolean) => {
+    // Prevent double firing on mobile
+    if (isTouch) {
+      touchedRef.current = true;
+    } else if (touchedRef.current) {
+      return;
+    }
+
+    animatePress(target, 'rgba(239, 68, 68, 0.3)');
     onBackspace();
-  };
+  }, [onBackspace]);
 
-  const handleBackspaceTouchEnd = (e: React.TouchEvent | React.MouseEvent) => {
-    const target = e.currentTarget as HTMLElement;
-    gsap.to(target, {
-      scale: 1,
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-      duration: 0.2,
-    });
-  };
+  const handleBackspaceRelease = useCallback((target: HTMLElement) => {
+    animateRelease(target);
+    resetTouchFlag();
+  }, [resetTouchFlag]);
 
-  // Feedback para enviar
-  const handleSubmitTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+  // Handle submit
+  const handleSubmitPress = useCallback((target: HTMLElement, isTouch: boolean) => {
     if (isSubmitDisabled || isLoading) return;
-    const target = e.currentTarget as HTMLElement;
-    gsap.to(target, {
-      scale: 0.95,
-      duration: 0.1,
-    });
-    onSubmit();
-  };
 
-  const handleSubmitTouchEnd = (e: React.TouchEvent | React.MouseEvent) => {
-    const target = e.currentTarget as HTMLElement;
-    gsap.to(target, {
-      scale: 1,
-      duration: 0.2,
-    });
-  };
+    // Prevent double firing on mobile
+    if (isTouch) {
+      touchedRef.current = true;
+    } else if (touchedRef.current) {
+      return;
+    }
+
+    gsap.to(target, { scale: 0.95, duration: 0.1 });
+    onSubmit();
+  }, [isSubmitDisabled, isLoading, onSubmit]);
+
+  const handleSubmitRelease = useCallback((target: HTMLElement) => {
+    gsap.to(target, { scale: 1, duration: 0.2 });
+    resetTouchFlag();
+  }, [resetTouchFlag]);
 
   return (
     <div
@@ -111,15 +133,23 @@ const NumericKeyboard: React.FC<NumericKeyboardProps> = ({
           {numericKeys.flat().map((key, index) => (
             <button
               key={index}
-              onTouchStart={(e) => key !== '' && handleKeyTouchStart(e, key)}
-              onTouchEnd={handleKeyTouchEnd}
-              onMouseDown={(e) => key !== '' && handleKeyTouchStart(e, key)}
-              onMouseUp={handleKeyTouchEnd}
-              onMouseLeave={handleKeyTouchEnd}
+              onTouchStart={(e) => {
+                e.preventDefault();
+                if (key !== '') handleKeyPress(key, e.currentTarget, true);
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                handleKeyRelease(e.currentTarget);
+              }}
+              onMouseDown={(e) => {
+                if (key !== '') handleKeyPress(key, e.currentTarget, false);
+              }}
+              onMouseUp={(e) => handleKeyRelease(e.currentTarget)}
+              onMouseLeave={(e) => handleKeyRelease(e.currentTarget)}
               disabled={key === ''}
               className={`
                 flex items-center justify-center rounded-xl text-5xl font-bold text-white
-                transition-colors select-none
+                transition-colors select-none touch-manipulation
                 ${key === ''
                   ? 'bg-transparent cursor-default'
                   : 'bg-white/10 hover:bg-white/20 active:bg-green-500/30 cursor-pointer'
@@ -135,12 +165,18 @@ const NumericKeyboard: React.FC<NumericKeyboardProps> = ({
         <div className="col-span-1 grid grid-rows-2 gap-2">
           {/* Backspace - ocupa metade superior */}
           <button
-            onTouchStart={handleBackspaceTouchStart}
-            onTouchEnd={handleBackspaceTouchEnd}
-            onMouseDown={handleBackspaceTouchStart}
-            onMouseUp={handleBackspaceTouchEnd}
-            onMouseLeave={handleBackspaceTouchEnd}
-            className="flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 active:bg-red-500/30 text-white text-4xl transition-colors select-none cursor-pointer"
+            onTouchStart={(e) => {
+              e.preventDefault();
+              handleBackspacePress(e.currentTarget, true);
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              handleBackspaceRelease(e.currentTarget);
+            }}
+            onMouseDown={(e) => handleBackspacePress(e.currentTarget, false)}
+            onMouseUp={(e) => handleBackspaceRelease(e.currentTarget)}
+            onMouseLeave={(e) => handleBackspaceRelease(e.currentTarget)}
+            className="flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 active:bg-red-500/30 text-white text-4xl transition-colors select-none touch-manipulation cursor-pointer"
           >
             <svg
               className="w-10 h-10"
@@ -159,15 +195,21 @@ const NumericKeyboard: React.FC<NumericKeyboardProps> = ({
 
           {/* Enviar - ocupa metade inferior */}
           <button
-            onTouchStart={handleSubmitTouchStart}
-            onTouchEnd={handleSubmitTouchEnd}
-            onMouseDown={handleSubmitTouchStart}
-            onMouseUp={handleSubmitTouchEnd}
-            onMouseLeave={handleSubmitTouchEnd}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              handleSubmitPress(e.currentTarget, true);
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              handleSubmitRelease(e.currentTarget);
+            }}
+            onMouseDown={(e) => handleSubmitPress(e.currentTarget, false)}
+            onMouseUp={(e) => handleSubmitRelease(e.currentTarget)}
+            onMouseLeave={(e) => handleSubmitRelease(e.currentTarget)}
             disabled={isSubmitDisabled || isLoading}
             className={`
               flex items-center justify-center rounded-xl text-white text-lg font-bold uppercase tracking-wider
-              transition-all select-none
+              transition-all select-none touch-manipulation
               ${isSubmitDisabled || isLoading
                 ? 'bg-gray-600/50 cursor-not-allowed opacity-50'
                 : 'bg-gradient-to-br from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 shadow-lg shadow-green-500/30 cursor-pointer'
