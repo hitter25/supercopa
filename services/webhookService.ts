@@ -60,23 +60,32 @@ export function isWebhookConfigured(): boolean {
  * O N8N pode então processar e enviar via WhatsApp Business API
  */
 export async function triggerWebhook(payload: WebhookPayload): Promise<WebhookResponse> {
+  const webhookUrl = getWebhookUrl();
+
+  // Debug: Log environment state
+  console.log('🔍 [DEBUG] Webhook Environment Check:');
+  console.log('  - window.__ENV__:', typeof window !== 'undefined' ? JSON.stringify(window.__ENV__) : 'N/A');
+  console.log('  - webhookUrl:', webhookUrl);
+  console.log('  - isConfigured:', isWebhookConfigured());
+
   // Verificar se o webhook está configurado
   if (!isWebhookConfigured()) {
-    console.warn('⚠️ Webhook N8N não configurado. Configure VITE_N8N_WEBHOOK_URL no .env.local');
+    console.warn('⚠️ Webhook N8N não configurado. Configure VITE_N8N_WEBHOOK_URL no Cloud Run.');
     return {
       success: false,
       message: 'Webhook não configurado',
-      error: 'VITE_N8N_WEBHOOK_URL não está definido'
+      error: 'VITE_N8N_WEBHOOK_URL não está definido. Verifique as variáveis de ambiente no Cloud Run.'
     };
   }
 
   console.log('🚀 Disparando webhook N8N...');
-  console.log('📍 URL:', getWebhookUrl());
+  console.log('📍 URL:', webhookUrl);
   console.log('📦 Payload:', JSON.stringify(payload, null, 2));
 
   try {
-    const response = await fetch(getWebhookUrl(), {
+    const response = await fetch(webhookUrl, {
       method: 'POST',
+      mode: 'cors',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -121,13 +130,27 @@ export async function triggerWebhook(payload: WebhookPayload): Promise<WebhookRe
 
   } catch (error: any) {
     console.error('❌ Erro ao disparar webhook:', error);
+    console.error('❌ [DEBUG] Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+
+    // Tratar erros de CORS
+    if (error.message?.includes('CORS') || error.message?.includes('cross-origin')) {
+      return {
+        success: false,
+        message: 'Erro de CORS',
+        error: 'O servidor N8N precisa permitir requisições do domínio de produção. Configure os headers CORS no N8N.'
+      };
+    }
 
     // Tratar erros de rede
-    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+    if (error.name === 'TypeError' && (error.message.includes('fetch') || error.message.includes('Failed to fetch'))) {
       return {
         success: false,
         message: 'Erro de conexão com o webhook',
-        error: 'Não foi possível conectar ao servidor N8N. Verifique a URL e a conexão.'
+        error: 'Não foi possível conectar ao servidor N8N. Verifique a URL, conexão e CORS.'
       };
     }
 
